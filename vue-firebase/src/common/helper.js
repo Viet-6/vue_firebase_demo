@@ -9,6 +9,11 @@ function formatDate(date, format = 'YYYY-MM-DD HH:mm:ss') {
         replace(/ss/g, date.getSeconds().toString().padStart(2, '0'));
 }
 
+function getLastObjectInObjects(obj) {
+    const lastIndex = Object.keys(obj).length - 1;
+    return Object.keys(obj)[lastIndex];
+}
+
 export {
-    formatDate
+    formatDate, getLastObjectInObjects
 }

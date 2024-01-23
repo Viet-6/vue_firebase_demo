@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app"
 import { firebaseConfig } from "./config"
-import { QuerySnapshot, addDoc, getFirestore, limit, onSnapshot, orderBy, where } from "firebase/firestore";
+import { QuerySnapshot, addDoc, getFirestore, limit, onSnapshot, orderBy, startAfter, startAt, where } from "firebase/firestore";
 import { collection, doc, getDocs, setDoc,  getDoc, query } from 'firebase/firestore';
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -12,7 +12,7 @@ class FirestoreHandler {
         this.path = path;
         this.pathSegments = pathSegments;
         this.queries = [];
-        this.lastQuery = [];
+        this.lastQuery = null;
         this.unsubscribe = () => {
             return null;
         };
@@ -52,6 +52,11 @@ class FirestoreHandler {
         return this;
     }
 
+    startAfter(value) {
+        this.queries.push(startAfter(value));
+        return this;
+    }
+
     take(number) {
         this.queries.push(limit(number));
         return this;
@@ -61,17 +66,11 @@ class FirestoreHandler {
         let q = this.getRef();
         if (this.queries.length) {
             q = query(q, ...this.queries);
-            this.lastQuery = this.queries;
+            this.lastQuery = q;
             this.queries = [];
         }
         
-        const docs = await getDocs(q);
-        let data = {};
-        docs.forEach((doc) => {
-            data[doc.id] = doc.data();
-        })
-
-        return data;
+        return await getDocs(q);
     }
 
     async first() {
@@ -79,35 +78,22 @@ class FirestoreHandler {
         this.take(1);
         if (this.queries.length) {
             q = query(q, ...this.queries);
-            this.lastQuery = this.queries;
+            this.lastQuery = q;
             this.queries = [];
         }
         
-        const docs = await getDocs(q);
-        let data = {};
-        docs.forEach((doc) => {
-            data = {
-                id: doc.id,
-                data: doc.data()
-            };
-        })
-
-        return data;
+        return await getDocs(q);
     }
 
-    fetchOnSnapshot(response = {}) {
+    fetchOnSnapshot(handleResponse) {
         let q = this.getRef();
         if (this.queries.length) {
             q = query(q, ...this.queries);
-            this.lastQuery = this.queries;
+            this.lastQuery = q;
             this.queries = [];
         }
         
-        this.unsubscribe = onSnapshot(q, (querySnapshot) => {
-            querySnapshot.forEach((doc) => {
-                response[doc.id] = doc.data();
-            });
-        });
+        this.unsubscribe = onSnapshot(q, handleResponse);
     }
 
     generateId() {
