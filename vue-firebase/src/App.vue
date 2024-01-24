@@ -1,6 +1,18 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
+import { ref } from 'vue';
+
+const enable = ref(false);
+
+const enableBtn = (id) => {
+  if (id) {
+    enable.value = true;
+    window.sessionStorage.setItem('id', id);
+  } else {
+    enable.value = false;
+  }
+}
 </script>
 
 <template>
@@ -12,12 +24,12 @@ import HelloWorld from './components/HelloWorld.vue'
 
       <nav>
         <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
+        <RouterLink to="/about" v-if="enable">About</RouterLink>
       </nav>
     </div>
   </header>
 
-  <RouterView />
+  <RouterView  @selectedAccount="enableBtn"/>
 </template>
 
 <style scoped>

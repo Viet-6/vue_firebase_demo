@@ -3,13 +3,10 @@
     <div class="wrappers">
       <div class="container">
         <div class="left">
-          <div class="top">
-            <input type="text" placeholder="Search" v-model="currentAcc" />
-          </div>
           <ul class="people">
             <template v-for="(user, key) in users">
-              <li class="person" :class="{ 'active': selected === key }" @click="setSelected(key)">
-                <img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/382994/thomas.jpg"/>
+              <li class="person" :class="{ 'active': selected === key }" @click="setSelected(key)" v-if="key !== currentAcc">
+                <img :src="user.avatar"/>
                 <span class="name">{{ user.name }}</span>
                 <span class="time">2:09 PM</span>
                 <span class="preview">I ...</span>
@@ -34,21 +31,48 @@
             </div>
             <div class="chat active-chat" id="style-1" ref="chatboxRef" @scroll.passive="loadmore">
               <template v-for="(item, key) in loadmoreMessages">
-                <div class="bubble reverse" :class="item.sender === currentAcc ? 'me' : 'you'">
-                    {{ item.message }}
+                <div class="message-container" :class="item.sender === currentAcc ? 'flex--end' : ''">
+                  <div class="chat--bubble flex--end" :class="item.sender === currentAcc ? 'flex-reverse' : ''" v-if="item.message">
+                    <div class="bubble reverse" :class="item.sender === currentAcc ? 'me' : 'you'">
+                        {{ item.message }}
+                    </div>
+                    <span class="time" :class="item.sender === currentAcc ? 'from--right' : ''">{{ formatDate(item.send_at, "HH:mm") }}</span>
+                  </div>
+                  <div class="attachments">
+                      <template v-for="url in item.attachments">
+                        <img :src="url" :class="item.sender === currentAcc ? 'from--right' : ''"/>
+                      </template>
+                  </div>
+                  <div class="from--user align-center" :class="item.sender === currentAcc ? 'from--right' : ''">
+                      <img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/382994/thomas.jpg">
+                      <span class="name" v-if="item.sender !== currentAcc">MQ</span>
+                  </div>
                 </div>
-                <span class="time" :class="item.sender === currentAcc ? 'from--right' : ''">{{ formatDate(item.send_at, "HH:mm") }}</span>
               </template>
                 <template v-for="(item, key) in messages">
-                  <div class="bubble" :class="item.sender === currentAcc ? 'me' : 'you'">
-                      {{ item.message }}
+                  <div class="message-container" :class="item.sender === currentAcc ? 'flex--end' : ''">
+                    <div class="chat--bubble flex--end" :class="item.sender === currentAcc ? 'flex-reverse' : ''" v-if="item.message">
+                      <div class="bubble" :class="item.sender === currentAcc ? 'me' : 'you'">
+                          {{ item.message }}
+                      </div>
+                      <span class="time"  :class="item.sender === currentAcc ? 'from--right' : ''">{{ formatDate(item.send_at, "HH:mm") }}</span>
+                    </div>
+                    <div class="attachments">
+                      <template v-for="url in item.attachments">
+                        <img :src="url" :class="item.sender === currentAcc ? 'from--right' : ''" @change=""/>
+                      </template>
+                    </div>
+                    <div class="from--user align-center" :class="item.sender === currentAcc ? 'from--right' : ''">
+                      <img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/382994/thomas.jpg">
+                      <span class="name" v-if="item.sender !== currentAcc">MQ</span>
                   </div>
-                  <span class="time"  :class="item.sender === currentAcc ? 'from--right' : ''">{{ formatDate(item.send_at, "HH:mm") }}</span>
+                  </div>
                 </template>
             </div>
           </div>
           <div class="write">
-              <a href="javascript:;" class="write-link attach"></a>
+              <input type="file" ref="fileInput" id="files" name="files" accept="image/*" multiple @change="selectFiles" v-show="false">
+              <a href="javascript:;" class="write-link attach" @click="attachFile"></a>
               <input type="text" v-model="message" @keyup.enter="sendMessage"/>
               <a href="javascript:;" class="write-link smiley"></a>
               <a href="javascript:;" class="write-link send" @click="sendMessage"></a>
@@ -68,7 +92,7 @@ const users = ref({});
 const conversation = ref({});
 const messages = ref({});
 const selected = ref();
-const currentAcc = ref('AALlse6HUpwOH3AXK9oZ');
+const currentAcc = ref('');
 const userRef = new FirestoreHandler('users');
 const conversationRef = new FirestoreHandler('conversations');
 const message = ref('');
@@ -79,8 +103,22 @@ const stopLoadmore = ref(false);
 const shouldScroll = ref(false);
 const lastDocument = ref();
 const loading = ref(false);
+const files = ref([]);
+const fileInput = ref();
+const attachments = ref([]);
 
 const messageTo = computed(() => users.value[selected.value]?.name);
+
+const selectFiles = () => {
+  for (let index = 0; index < fileInput.value.files.length; index++) {
+    files.value.push(fileInput.value.files[index]);
+  }
+}
+
+const attachFile = () => {
+  fileInput.value?.click();
+  fileInput.value.value = '';
+}
 
 const handleMessagesResponse = (querySnapshot) => {
   let docsLength = querySnapshot.docs.length;
@@ -129,15 +167,30 @@ const openChat = async () => {
   messageRef.value.orderBy('send_at', 'desc').take(10).fetchOnSnapshot(handleMessagesResponse);
 }
 
+const getAttachments = (url) => {
+  attachments.value.push(url)
+}
+
 const sendMessage = async () => {
-  if (!message.value) return;
-  const newMessage = message.value;
+  if (!message.value && !files.value.length) return;
+  if (files.value.length) {
+    messageRef.value.uploadFile(files.value, getAttachments, 'image');
+  } else {
+    saveMessageAction(message.value);
+  }
+}
+
+const saveMessageAction = async (msg = '', attachs = []) => {
   message.value = '';
+  files.value = [];
+  attachments.value = [];
+
   await messageRef.value.save({
-    message: newMessage,
+    message: msg,
     sender: currentAcc.value,
     read: false,
-    send_at: formatDate(new Date())
+    send_at: formatDate(new Date()),
+    attachments: attachs
   });
 }
 
@@ -174,16 +227,35 @@ watch(shouldScroll, async (newVal) => {
   }
 })
 
+watch(() => attachments.value, (newVal) => {
+  if (!attachments.value.length) return;
+  if (attachments.value.length === files.value.length) {
+    saveMessageAction(message.value, attachments.value)
+  }
+}, { deep: true })
+
 onMounted(async () => {
-  await userRef.all().then((docs) => {
-    docs.forEach((doc) => {
-      users.value[doc.id] = doc.data();
+  currentAcc.value = window.sessionStorage.getItem('id');
+  if (currentAcc.value) {
+    await userRef.update({
+      inused: true,
+    }, userRef.getDoc(currentAcc.value))
+
+    await userRef.where('inused', '==', true).get().then((docs) => {
+      docs.forEach((doc) => {
+        users.value[doc.id] = doc.data();
+      });
     });
-  });
+
+  }
 });
 
-onBeforeUnmount(() => {
-  messageRef.value.unsubscribe();
+onBeforeUnmount(async () => {
+  messageRef.value?.unsubscribe();
+  window.sessionStorage.clear();
+  await userRef.update({
+      inused: false,
+    }, userRef.getDoc(currentAcc.value))
 });
 </script>
 
@@ -505,6 +577,7 @@ ul {
   padding: 13px 14px;
   vertical-align: top;
   border-radius: 5px;
+  line-break: anywhere;
 }
 .container .right .bubble:before {
   position: absolute;
@@ -706,10 +779,56 @@ to { stroke-dashoffset: 1165; }
 
 .time {
     float: left;
-    clear: both;
+    margin-left: 5px;
+    margin-bottom: 2px;
     animation-name: slideFromRight;
 }
 .time.from--right {
-float: right;
+  margin-right: 5px;
+  animation-name: slideFromLeft;
+}
+.from--right {
+  float: right!important;
+}
+.chat--bubble.flex--end {
+  display: flex;
+  align-items: flex-end;
+}
+
+.from--user.align-center {
+  display: flex;
+  align-items: center;
+}
+
+.from--user.align-center img {
+  float: left;
+  width: 25px;
+  height: 25px;
+  margin-right: 8px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.flex-reverse {
+  flex-direction: row-reverse;
+}
+
+.message-container {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.message-container.flex--end {
+  align-items: flex-end;
+}
+
+.attachments img {
+  float: left;
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin-bottom: 7px;
+  margin-left: 5px;
 }
 </style>

@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app"
 import { firebaseConfig } from "./config"
-import { QuerySnapshot, addDoc, getFirestore, limit, onSnapshot, orderBy, startAfter, startAt, where } from "firebase/firestore";
+import { QuerySnapshot, addDoc, getFirestore, limit, onSnapshot, orderBy, startAfter, startAt, updateDoc, where } from "firebase/firestore";
 import { collection, doc, getDocs, setDoc,  getDoc, query } from 'firebase/firestore';
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage"
 
 const firebaseApp = initializeApp(firebaseConfig);
 const firestore = getFirestore(firebaseApp);
@@ -40,6 +41,19 @@ class FirestoreHandler {
 
     all() {
         return this.get();
+    }
+
+    getDoc(id) {
+        return doc(firestore, this.getPath(), ...this.getPathSegments(), id);
+    }
+
+    async update(data, doc) {
+        await updateDoc(doc, data);
+    }
+
+    where(column, operators, value) {
+        this.queries.push(where(column, operators, value));
+        return this;
     }
 
     whereIn(column, values) {
@@ -106,6 +120,16 @@ class FirestoreHandler {
 
     async saveWithCustomId(data, ...id) {
         return await setDoc(doc(firestore, this.getPath(), ...this.getPathSegments(), ...id), data);
+    }
+
+    uploadFile(files, callback = () => {}, path = '') {
+        files.forEach(file => {
+            const storage = getStorage();
+            const storageRef = ref(storage, path + '/' + file.name);
+            uploadBytes(storageRef, file).then(() => {
+                getDownloadURL(storageRef).then(callback);
+            });
+        });
     }
 }
 
