@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app"
 import { firebaseConfig } from "./config"
-import { QuerySnapshot, addDoc, getFirestore, limit, onSnapshot, orderBy, startAfter, startAt, updateDoc, where } from "firebase/firestore";
+import { QuerySnapshot, addDoc, getFirestore, limit, onSnapshot, orderBy, startAfter, startAt, updateDoc, where, writeBatch } from "firebase/firestore";
 import { collection, doc, getDocs, setDoc,  getDoc, query } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage"
 
@@ -47,6 +47,10 @@ class FirestoreHandler {
         return doc(firestore, this.getPath(), ...this.getPathSegments(), id);
     }
 
+    async find(doc) {
+        return await getDoc(doc);
+    }
+
     async update(data, doc) {
         await updateDoc(doc, data);
     }
@@ -58,6 +62,11 @@ class FirestoreHandler {
 
     whereIn(column, values) {
         this.queries.push(where(column, 'in', values));
+        return this;
+    }
+
+    whereArrayContains(column, value) {
+        this.queries.push(where(column, 'array-contains', value));
         return this;
     }
 
@@ -120,6 +129,54 @@ class FirestoreHandler {
 
     async saveWithCustomId(data, ...id) {
         return await setDoc(doc(firestore, this.getPath(), ...this.getPathSegments(), ...id), data);
+    }
+
+    async batchInsert(ids, data) {
+        const batches = [];
+        let currentBatch = writeBatch(firestore);
+        let counter = 0;
+    
+        ids.forEach((id, index) => {
+            const reference = doc(firestore, this.getPath(), ...this.getPathSegments(), id);
+            if (!reference) return;
+    
+            currentBatch.set(reference, data);
+            counter++;
+    
+            if (counter === 500 || index === ids.length - 1) {  
+                batches.push(currentBatch);  
+                currentBatch = writeBatch(firestore);
+                counter = 0; 
+              }
+        })
+    
+        for (const batch of batches) {  
+            await batch.commit();  
+        }
+    }
+
+    async batchUpdate(ids, data) {
+        const batches = [];
+        let currentBatch = writeBatch(firestore);
+        let counter = 0;
+    
+        ids.forEach((id, index) => {
+            const reference = doc(firestore, this.getPath(), ...this.getPathSegments(), id);
+            if (!reference) return;
+    
+            currentBatch.update(reference, data);
+            counter++;
+    
+            if (counter === 500 || index === ids.length - 1) {  
+                batches.push(currentBatch);  
+                currentBatch = writeBatch(firestore);
+                counter = 0; 
+              }
+        })
+    
+        for (const batch of batches) {  
+            await batch.commit();  
+        }
     }
 
     uploadFile(files, callback = () => {}, path = '') {
