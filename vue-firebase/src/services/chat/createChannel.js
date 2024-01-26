@@ -1,11 +1,11 @@
 import { FirestoreHandler } from '@/utils/firebase/init';
 import { CHANNEL_TYPE } from '@/common/constants';
-import { arrayUnion, Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 export async function createChannel(request) {
     const { channel_name: channelName, host_id: hostId, channel_type: channelType, members: members } = request;
     const now = Timestamp.fromDate(new Date());
-    console.log(channelName, hostId, channelType, members)
+
     if (!members) {
         members = [];
     }
@@ -40,8 +40,6 @@ export async function createChannel(request) {
             return channel.id;
         }
     }
-
-    console.log(hostId);
 
     const channel = await channelRef.save({
         channel_name: channelName,

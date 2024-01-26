@@ -8,7 +8,7 @@ export async function syncMessages(request, onSnapshotCallback) {
     if (!channelId || !memberId) {
         return -1;
     }
-    console.log(123123);
+
     const channelRef = new FirestoreHandler('channels');
     const currentChannelDoc = channelRef.getDoc(channelId);
     const channel = await channelRef.find(currentChannelDoc);
@@ -33,18 +33,11 @@ export async function syncMessages(request, onSnapshotCallback) {
     const messageRef = new FirestoreHandler('channels', channel.id, 'messages');
     messageRef.unsubscribe();
     messageRef.orderBy('created_at', 'desc').take(10).fetchOnSnapshot(async (querySnapshot) => {
-        let currentChannel = await channelRef.find(currentChannelDoc);
-        let currentUser = await userRef.find(currentUserDoc);
-        if (!currentChannel || !currentUser) {
-            messageRef.unsubscribe();
-            return;
-        }
-
         let onSnapshotDocs = [];
 
         querySnapshot.docChanges().forEach((change) => {
             const doc = change.doc;
-            if (change.type === "added" && doc.data().sender_id !== currentUser.id) {
+            if (change.type === "added" && doc.data().sender_id !== user.id) {
                 onSnapshotDocs.push(doc)
             }
             if (change.type === "modified") {
@@ -55,20 +48,20 @@ export async function syncMessages(request, onSnapshotCallback) {
             }
         });
 
+        onSnapshotCallback(querySnapshot);
+        
         onSnapshotDocs.forEach((doc) => {            
-            if (!(currentUser.id in doc.data().readers)) {
+            if (!(user.id in doc.data().readers)) {
                 messageRef.update({
-                    ['readers.' + currentUser.id + '.read_at']: now,
+                    ['readers.' + user.id + '.read_at']: now,
                 }, messageRef.getDoc(doc.id));
-    
+
                 userRef.update({
                     ['joined_channels.' +channel.id + '.unread_message']: increment(-1),
                 }, currentUserDoc);
             }
         });
-
-        onSnapshotCallback(querySnapshot);
     });
 
-    return 1;
+    return messageRef;
 }

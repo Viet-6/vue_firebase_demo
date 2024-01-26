@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app"
 import { firebaseConfig } from "./config"
-import { QuerySnapshot, addDoc, getFirestore, limit, onSnapshot, orderBy, startAfter, startAt, updateDoc, where, writeBatch } from "firebase/firestore";
+import { QuerySnapshot, addDoc, getCountFromServer, getFirestore, limit, onSnapshot, orderBy, startAfter, startAt, updateDoc, where, writeBatch } from "firebase/firestore";
 import { collection, doc, getDocs, setDoc,  getDoc, query } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage"
 
@@ -129,6 +129,17 @@ class FirestoreHandler {
 
     async saveWithCustomId(data, ...id) {
         return await setDoc(doc(firestore, this.getPath(), ...this.getPathSegments(), ...id), data);
+    }
+
+    async count() {
+        let q = this.getRef();
+        if (this.queries.length) {
+            q = query(q, ...this.queries);
+            this.lastQuery = q;
+            this.queries = [];
+        }
+        
+        return await getCountFromServer(q);
     }
 
     async batchInsert(ids, data) {

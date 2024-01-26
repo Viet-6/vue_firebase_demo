@@ -1,5 +1,5 @@
 import { FirestoreHandler } from "@/utils/firebase/init";
-import { Timestamp, arrayUnion, increment, updateDoc } from "firebase/firestore";
+import { Timestamp, increment } from "firebase/firestore";
 
 export async function sendMessage(request) {
     const { 
@@ -40,7 +40,7 @@ export async function sendMessage(request) {
     const lastMessageSnippet = attachments.length ? 'ファイルを送信しました。' : payload;
 
     const messageRef = new FirestoreHandler('channels', channel.id, 'messages');
-    await messageRef.save({
+    messageRef.save({
         payload: payload,
         attachments: attachments,
         sender_id: user.id,
@@ -48,7 +48,7 @@ export async function sendMessage(request) {
         created_at: now,
     });
 
-    await channelRef.update({
+    channelRef.update({
         last_send_member: user.data().name,
         last_send_at: now,
         last_message: lastMessageSnippet
@@ -63,7 +63,7 @@ export async function sendMessage(request) {
         channelMembers.push(channel.data().host_id);
     }
 
-    await userRef.batchUpdate(channelMembers, {
+    userRef.batchUpdate(channelMembers, {
         ['joined_channels.' + channel.id + '.unread_message']: increment(1),
     })
 }
