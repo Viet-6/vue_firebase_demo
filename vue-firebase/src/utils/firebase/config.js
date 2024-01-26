@@ -1,10 +1,10 @@
 const firebaseConfig = {
-    apiKey: "AIzaSyD-KRPNHI6kddtd1q87H40bit7JogMWwLU",
-    authDomain: "fir-vue-7734f.firebaseapp.com",
-    projectId: "fir-vue-7734f",
-    storageBucket: "fir-vue-7734f.appspot.com",
-    messagingSenderId: "638106076788",
-    appId: "1:638106076788:web:8f0b2b895bdf3c3fdbb321"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 export { firebaseConfig }

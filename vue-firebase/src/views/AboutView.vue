@@ -5,10 +5,13 @@
         <div class="left">
           <ul class="people">
             <template v-for="(user, key) in users">
-              <li class="person" :class="{ 'active': selected === key }" @click="setSelected(key)" v-if="key !== currentAcc">
+              <li class="person" :class="{ 'active': selected === key }" @click="setSelected(key)">
                 <img :src="user.avatar"/>
                 <span class="name">{{ user.name }}</span>
-                <span class="time">2:09 PM</span>
+                <template>
+
+                </template>
+                <span class="time" :data-unread="123">2:09 PM</span>
                 <span class="preview">I ...</span>
               </li>
             </template>
@@ -87,6 +90,9 @@
 import { FirestoreHandler }  from '../utils/firebase/init';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { formatDate } from '../common/helper';
+import Auth from '@/services/firebase/auth';
+import syncUserList from '@/services/chat/syncUserList';
+import syncUnreadMessage from '@/services/chat/syncUnreadMessage';
 
 const users = ref({});
 const conversation = ref({});
@@ -106,6 +112,8 @@ const loading = ref(false);
 const files = ref([]);
 const fileInput = ref();
 const attachments = ref([]);
+const auth = new Auth();
+const unreadMessages = ref({});
 
 const messageTo = computed(() => users.value[selected.value]?.name);
 
@@ -234,19 +242,24 @@ watch(() => attachments.value, (newVal) => {
   }
 }, { deep: true })
 
+const handleUsersResponse = (querySnapshot) => {
+  let docsLength = querySnapshot.docs.length;
+  for (let index = docsLength - 1; index >= 0; index--) {
+    let doc = querySnapshot.docs[index];
+    users.value[doc.id] = doc.data();
+  }
+}
+
+const handleUnreadMessage = (snapshot) => {
+  unreadMessages.value = snapshot.data().joined_channels;
+}
+
 onMounted(async () => {
-  currentAcc.value = window.sessionStorage.getItem('id');
+  currentAcc.value = auth.currentUser();
+  
   if (currentAcc.value) {
-    await userRef.update({
-      inused: true,
-    }, userRef.getDoc(currentAcc.value))
-
-    await userRef.where('inused', '==', true).get().then((docs) => {
-      docs.forEach((doc) => {
-        users.value[doc.id] = doc.data();
-      });
-    });
-
+    syncUserList(handleUsersResponse);
+    syncUnreadMessage(handleUnreadMessage);
   }
 });
 
@@ -830,5 +843,14 @@ to { stroke-dashoffset: 1165; }
   object-fit: contain;
   margin-bottom: 7px;
   margin-left: 5px;
+}
+
+.person .time::after {
+  content: attr(data-unread);
+  top: -13px;
+  position: absolute;
+  border: 1px solid #965757;
+  border-radius: 50%;
+  background: red;
 }
 </style>

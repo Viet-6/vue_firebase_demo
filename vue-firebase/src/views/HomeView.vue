@@ -2,24 +2,18 @@
 import router from '@/router';
 import { FirestoreHandler }  from '../utils/firebase/init';
 import { onMounted, ref, watch } from 'vue';
+import Auth from '@/services/firebase/auth';
 
-const users = ref({});
 const userRef = new FirestoreHandler('users');
 const currentAcc = ref('');
 const addNew = ref(false);
 const username = ref('');
 const avatar = ref('');
 const loading = ref(false);
+const password = ref();
+const auth = new Auth();
 
 const emit = defineEmits(['selectedAccount']);
-
-onMounted(async () => {
-  await userRef.where('inused', '==', false).get().then((docs) => {
-    docs.forEach((doc) => {
-      users.value[doc.id] = doc.data();
-    });
-  });
-});
 
 watch(currentAcc, (newVal) => {
   window.sessionStorage.clear();
@@ -31,32 +25,41 @@ const saveUser = async () => {
 
   loading.value = true;
 
-  if (!username.value) return;
-  const newUser = await userRef.save({
-    name: username.value,
-    avatar: avatar.value || 'https://s3-us-west-2.amazonaws.com/s.cdpn.io/382994/thomas.jpg',
-    unread_message: 0,
-    inused: false,
-  });
+  if (!username.value || !password.value) return;
 
-  currentAcc.value = newUser.id;
+  let userCredential;
+  if (addNew.value) {
+    userCredential = await auth.createUserBasic(username.value, password.value);
+  } else {
+    userCredential = await auth.basicSignIn(username.value, password.value);
+  }
+
+  const user = userCredential?.user;
+
+  if (user?.uid) {
+    currentAcc.value = user?.uid;
+
+    await userRef.saveWithCustomId({
+      name: user.email.split('@')[0],
+      user_token: currentAcc.value,
+      avatar: avatar.value || 'https://s3-us-west-2.amazonaws.com/s.cdpn.io/382994/thomas.jpg',
+      joined_channels: {},
+    }, currentAcc.value);
+    router.push('/about');
+  }
+
   loading.value = false;
-  router.push('/about');
 }
 </script>
 
 <template>
   <main>
-    <select v-model="currentAcc">
-      <option :value="''">Select Account</option>
-      <template v-for="(user, key) in users">
-        <option :value="key">{{ user.name }}</option>
-      </template>
-    </select>
     <button style="margin-left:15px" @click="addNew = !addNew">+</button>
-    <div class="input--div" v-if="addNew">
-      <input type="text" class="input" v-model="username" placeholder="name" @keyup.enter="saveUser">
-      <input type="text" class="input" v-model="avatar" placeholder="avatar url">
+    <div class="input--div">
+      <input type="email" class="input" v-model="username" placeholder="name" @keyup.enter="saveUser">
+      <input type="text" class="input" v-model="avatar" placeholder="avatar url" v-if="addNew">
+      <input type="text" class="input" v-model="password" placeholder="password">
+      <button @click="saveUser">{{ addNew ? 'Register' : 'Login' }}</button>
     </div>
   </main>
 </template>
